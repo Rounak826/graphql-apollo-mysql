@@ -1,10 +1,10 @@
-interface Response {}
 const typeDefs = `#graphql
   type BaseResponse {
     status: Int!,
     message: String!,
     success: Boolean!,
   }
+  scalar Upload
   type Users {
     id: ID!
     name: String!,
@@ -18,13 +18,17 @@ const typeDefs = `#graphql
     user: Users
 
   }
+  type FileResponse {
+    response: BaseResponse!
+    url: String
+  }
   type Query {
     getUsers: [Users]
 
   }
   type Mutation {
     addUser(id:ID!, name:String!, username: String!, password: String!) : Users,
-    login(id: ID!, password: String!): LoginResponse
+    login(id: ID!, password: String!): LoginResponse,
   }
 `;
 

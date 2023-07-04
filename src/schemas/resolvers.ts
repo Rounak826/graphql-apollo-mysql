@@ -1,4 +1,3 @@
-import { error } from "console";
 import { Users } from "../Entities/Users";
 import { comparePasswords, encryptPassword } from "../Utils";
 

@@ -1,58 +1,41 @@
-import { ApolloServer } from "@apollo/server";
-import { startStandaloneServer } from "@apollo/server/standalone";
+import { ApolloServer } from "apollo-server-express";
+import express from "express";
 import AppDataSource from "./Config/DB";
-import typeDefs from "./schemas/typedefs";
-import resolvers from "./schemas/resolvers";
-import { makeExecutableSchema } from "@graphql-tools/schema";
-import { applyMiddleware } from "graphql-middleware";
-import { shield, rule, not, and, or, allow } from "graphql-shield";
-import { GetUserByToken } from "./Utils";
+import { upload } from "./Utils";
+import path from "path";
+import schemaWithPermissions from "./Rules";
 
-const isAuthenticated = rule({ cache: "contextual" })(
-  async (parent, args, ctx, info) => {
-    console.log({ token: ctx.token });
-    return ctx.token !== null;
-  }
-);
+const app = express();
 
-const isAdmin = rule({ cache: "contextual" })(
-  async (parent, args, ctx, info) => {
-    return ctx.user.role === "admin";
-  }
-);
-
-const isEditor = rule({ cache: "contextual" })(
-  async (parent, args, ctx, info) => {
-    return ctx.user.role === "editor";
-  }
-);
-
-const permissions = shield({
-  Query: {
-    getUsers: isAuthenticated,
-  },
-  Mutation: {
-    addUser: isAuthenticated,
-    login: isAuthenticated,
-  },
+app.use("/files", express.static(path.join(__dirname, "uploads")));
+app.use("/graphql", (req, _, next) => next());
+app.get("/", (req: any, res: any) => res.send("running"));
+app.post("/upload", (req, res) => {
+  console.log("sadas", req.file);
+  upload(req, res, (err: any) => {
+    if (err) {
+      console.log(err);
+      res.sendStatus(500);
+    }
+    res.send(req.file);
+  });
 });
 
-const schema = makeExecutableSchema({
-  typeDefs,
-  resolvers,
-});
-const schemaWithPermissions = applyMiddleware(schema, permissions);
 // The ApolloServer constructor requires two parameters: your schema
 // definition and your set of resolvers.
-const server = new ApolloServer({
-  schema: schemaWithPermissions,
-});
+let apolloServer = null;
+async function startServer() {
+  apolloServer = new ApolloServer({
+    schema: schemaWithPermissions,
+  });
+  await apolloServer.start();
+  apolloServer.applyMiddleware({ app });
+}
 
-// Passing an ApolloServer instance to the `startStandaloneServer` function:
-//  1. creates an Express app
-//  2. installs your ApolloServer instance as middleware
-//  3. prepares your app to handle incoming requests
+//Start Apollo server
+startServer();
 
+//Initialize Database Connection
 AppDataSource.initialize()
   .then(() => {
     console.log("Data Source has been initialized!");
@@ -61,11 +44,7 @@ AppDataSource.initialize()
     console.error("Error during Data Source initialization", err);
   });
 
-startStandaloneServer(server, {
-  context: async ({ req }) => {
-    const { token } = req.headers;
-    GetUserByToken(token);
-    return { token };
-  },
-  listen: { port: 4000 },
-}).then(({ url }) => console.log(`🚀  Server ready at: ${url}`));
+//Start Express Server
+app.listen({ port: 4000 }, () => {
+  console.log(`Server started on http://localhost:4000/graphql`);
+});
